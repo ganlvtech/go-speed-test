@@ -1,0 +1,45 @@
+<meta charset="UTF-8">
+<div>
+    文件大小: <input id="size" type="text" value="1073741824">
+    <button id="run">开始测速</button>
+</div>
+<div>
+    <pre id="log"></pre>
+</div>
+<script>
+  function log(s) {
+    console.log(s);
+    document.querySelector('#log').textContent = s;
+  }
+
+  async function run(size) {
+    log(`sending request. size=${size}`);
+    const res = await fetch(`/file.bin?size=${size}`);
+    log(`response ok. Content-Length=${res.headers.get('Content-Length')}`);
+    const reader = res.body.getReader({
+      mode: 'byob',
+    });
+    let buffer = new ArrayBuffer(1024 * 1024);
+    let bytesReceived = 0;
+    let t1BytesReceived = 0;
+    let t0 = Date.now();
+    let t1 = t0;
+    while (true) {
+      const {done, value} = await reader.read(new Uint8Array(buffer));
+      const now = Date.now();
+      if (done) {
+        log(`Read complete. dt=${String(now - t0).padStart(8)} ms bytesReceived=${String(bytesReceived).padStart(12)} avgSpeed=${(now > t0 ? ((bytesReceived / (1024 * 1024)) / ((now - t0) / 1000)).toFixed(2) : '').padStart(8)} MiB/s`);
+        break;
+      }
+      bytesReceived += value.byteLength;
+      if (now - t1 > 200) {
+        log(`Reading. dt=${String(now - t0).padStart(8)} ms bytesReceived=${String(bytesReceived).padStart(12)} speed=${(now > t1 ? (((bytesReceived - t1BytesReceived) / (1024 * 1024)) / ((now - t1) / 1000)).toFixed(2) : '').padStart(8)} MiB/s avgSpeed=${(now > t0 ? ((bytesReceived / (1024 * 1024)) / ((now - t0) / 1000)).toFixed(2) : '').padStart(8)} MiB/s`);
+        t1 = now;
+        t1BytesReceived = bytesReceived;
+      }
+      buffer = value.buffer;
+    }
+  }
+
+  document.querySelector('#run').addEventListener('click', () => run(parseInt(document.querySelector('#size').value)));
+</script>
